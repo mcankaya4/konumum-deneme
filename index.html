@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geliştirilmiş Konum Takip Sistemi</title>
+    <style>
+        #output,
+        #change {
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            font-family: Arial, sans-serif;
+            max-width: 300px;
+            margin: 10px auto;
+            text-align: left;
+        }
+
+        .status {
+            color: green;
+            font-weight: bold;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+    <h1 style="text-align: center;">Konum Takibi</h1>
+    <button onclick="startTracking()">Takibi Başlat</button>
+    <button onclick="stopTracking()">Takibi Durdur</button>
+
+    <div id="output">
+        <p class="status">Son doğru konum bilgisi bekleniyor...</p>
+    </div>
+    <div id="change">
+        <p>Henüz bir değişiklik olmadı.</p>
+    </div>
+
+    <script>
+        let watchId; // watchPosition kimliği
+        let lastPosition = null; // Son alınan konum bilgisi
+        const minDistance = 2; // Minimum mesafe değişimi (metre)
+
+        function startTracking() {
+            const output = document.getElementById("output");
+            const change = document.getElementById("change");
+
+            if (!navigator.geolocation) {
+                output.innerHTML = "<p class='error'>Tarayıcınız konum takibini desteklemiyor.</p>";
+                return;
+            }
+
+            // Konum izlemeyi başlat
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude, accuracy } = position.coords;
+
+                    if (accuracy > 20) {
+                        output.innerHTML = `<p class='error'>Doğruluk düşük: ${accuracy.toFixed(2)} metre</p>`;
+                        return; // Doğruluk düşükse işlem yapma
+                    }
+
+                    if (lastPosition) {
+                        const distance = calculateDistance(
+                            lastPosition.latitude,
+                            lastPosition.longitude,
+                            latitude,
+                            longitude
+                        );
+
+                        if (distance >= minDistance) {
+                            change.innerHTML = `<p class="status">Konum değişikliği algılandı: ${distance.toFixed(2)} metre</p>`;
+                            lastPosition = { latitude, longitude }; // Yeni konumu güncelle
+                        } else {
+                            change.innerHTML = "<p>Değişim yok.</p>";
+                            return;
+                        }
+                    } else {
+                        lastPosition = { latitude, longitude }; // İlk kez konum alındığında kaydet
+                    }
+
+                    // Son doğru konumu yazdır
+                    output.innerHTML = `
+            <p>Enlem: ${latitude}</p>
+            <p>Boylam: ${longitude}</p>
+            <p>Doğruluk: ${accuracy.toFixed(2)} metre</p>
+          `;
+                },
+                (error) => {
+                    output.innerHTML = `<p class='error'>Konum hatası: ${error.message}</p>`;
+                },
+                {
+                    enableHighAccuracy: true, // Yüksek doğruluk isteği
+                    maximumAge: 0, // Eski konumları kullanma
+                    timeout: 5000, // Zaman aşımı süresi
+                }
+            );
+        }
+
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId); // İzlemeyi durdur
+                watchId = null;
+                document.getElementById("output").innerHTML = "<p class='status'>Konum takibi durduruldu.</p>";
+                document.getElementById("change").innerHTML = "<p>Takip durduruldu. Değişiklik algılanmayacak.</p>";
+            }
+        }
+
+        // İki koordinat arasındaki mesafeyi hesapla (Haversine formülü)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Dünya yarıçapı (metre)
+            const φ1 = (lat1 * Math.PI) / 180;
+            const φ2 = (lat2 * Math.PI) / 180;
+            const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+            const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+            const a =
+                Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c; // Mesafe (metre)
+        }
+    </script>
+</body>
+
+</html>
